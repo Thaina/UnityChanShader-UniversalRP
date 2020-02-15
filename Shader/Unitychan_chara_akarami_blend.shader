@@ -12,16 +12,17 @@ Shader "UnityChan/Blush - Transparent"
 
 	SubShader
 	{
-		Blend SrcAlpha OneMinusSrcAlpha, One One 
+		Blend SrcAlpha OneMinusSrcAlpha, One One
 		ZWrite Off
 		Tags
 		{
 			"Queue"="Geometry+3"
 			"IgnoreProjector"="True"
 			"RenderType"="Overlay"
-			"LightMode"="ForwardBase"
+//			"LightMode"="ForwardBase"
+			"LightMode" = "UniversalForward"
 		}
-		
+
 		Pass
 		{
 			Cull Back

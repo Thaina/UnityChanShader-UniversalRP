@@ -22,7 +22,8 @@ Shader "UnityChan/Clothing"
 		{
 			"RenderType"="Opaque"
 			"Queue"="Geometry"
-			"LightMode"="ForwardBase"
+//			"LightMode"="ForwardBase"
+			"LightMode" = "UniversalForward"
 		}
 
 		Pass

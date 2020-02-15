@@ -12,15 +12,16 @@ Shader "UnityChan/Skin - Transparent"
 
 	SubShader
 	{
-		Blend SrcAlpha OneMinusSrcAlpha, One One 
+		Blend SrcAlpha OneMinusSrcAlpha, One One
 		Tags
 		{
 			"Queue"="Transparent+1"
 			"IgnoreProjector"="True"
 			"RenderType"="Overlay"
-			"LightMode"="ForwardBase"
+//			"LightMode"="ForwardBase"
+			"LightMode" = "UniversalForward"
 		}
-		
+
 		Pass
 		{
 			Cull Back

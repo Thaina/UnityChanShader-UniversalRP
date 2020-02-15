@@ -22,7 +22,8 @@ Shader "UnityChan/Hair"
 		{
 			"RenderType"="Opaque"
 			"Queue"="Geometry"
-			"LightMode"="ForwardBase"
+//			"LightMode"="ForwardBase"
+			"LightMode" = "UniversalForward"
 		}
 
 		Pass

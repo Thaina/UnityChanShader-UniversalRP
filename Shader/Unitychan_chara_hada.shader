@@ -18,7 +18,8 @@ Shader "UnityChan/Skin"
 		{
 			"RenderType"="Opaque"
 			"Queue"="Geometry"
-			"LightMode"="ForwardBase"
+//			"LightMode"="ForwardBase"
+			"LightMode" = "UniversalForward"
 		}
 
 		Pass
@@ -35,20 +36,6 @@ CGPROGRAM
 #include "CharaSkin.cg"
 ENDCG
 		}
-
-		Pass
-		{
-			Cull Front
-			ZTest Less
-CGPROGRAM
-#pragma target 3.0
-#pragma vertex vert
-#pragma fragment frag
-#include "UnityCG.cginc"
-#include "CharaOutline.cginc"
-ENDCG
-		}
-
 	}
 
 	FallBack "Transparent/Cutout/Diffuse"

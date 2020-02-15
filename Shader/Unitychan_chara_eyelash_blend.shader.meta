@@ -1,7 +1,12 @@
 fileFormatVersion: 2
 guid: 9627902a73805264c818754ecb22c8f9
 ShaderImporter:
-  defaultTextures: []
+  externalObjects: {}
+  defaultTextures:
+  - _MainTex: {instanceID: 0}
+  - _FalloffSampler: {fileID: 2800000, guid: a18067604964b5a4d8fd5552ed0d789e, type: 3}
+  - _RimLightSampler: {instanceID: 0}
+  nonModifiableTextures: []
   userData: 
   assetBundleName: 
   assetBundleVariant: 
