@@ -24,12 +24,14 @@ sampler2D _MainTex;
 sampler2D _FalloffSampler;
 sampler2D _RimLightSampler;
 
+#ifdef ENABLE_NORMAL_MAP
+sampler2D _NormalMapSampler;
+#endif
+
 #ifdef SPECULAR
 sampler2D _SpecularReflectionSampler;
 sampler2D _EnvMapSampler;
-sampler2D _NormalMapSampler;
 
-// Constants
 #define FALLOFF_POWER 0.3
 #else
 #define FALLOFF_POWER 1.0
@@ -231,21 +233,21 @@ float4 frag( v2f i ) : COLOR
 #endif
 
 	float contributionTerm = saturate(dot(normalize(-_MainLightPosition.xyz), normalVec));
-	combinedColor *= _Color.rgb * _MainLightColor.rgb * contributionTerm;
+	combinedColor *= _Color.rgb * ((_MainLightColor.rgb * contributionTerm) + calculateAmbientLight(-normalVec));
 	float opacity = diffSamplerColor.a * _Color.a;
 
-	#ifdef ENABLE_CAST_SHADOWS
-		// Cast shadows
-		float3_t castShadowColor = _ShadowColor.rgb * combinedColor;
-		float_t attenuation = saturate( 2.0 * LIGHT_ATTENUATION( i ) - 1.0 );
-		combinedColor = lerp( castShadowColor, combinedColor, attenuation );
-	#endif
+#ifdef ENABLE_CAST_SHADOWS
+	// Cast shadows
+	float3_t castShadowColor = _ShadowColor.rgb * combinedColor;
+	float_t attenuation = saturate( 2.0 * LIGHT_ATTENUATION( i ) - 1.0 );
+	combinedColor = lerp( castShadowColor, combinedColor, attenuation );
+#endif
 
 	// Rimlight
 	float_t rimlightDot = saturate( 0.5 * ( dot( normalVec, i.lightDir ) + 1.0 ) );
 	falloffU = saturate( rimlightDot * falloffU );
 	falloffU = tex2D( _RimLightSampler, float2( falloffU, 0.25f ) ).r;
-	combinedColor = lerp(combinedColor,falloffU * diffSamplerColor.rgb,1 / 2.0);
+	combinedColor = lerp(combinedColor,falloffU * diffSamplerColor.rgb,0.5);
 
-	return float4( calculateAmbientLight(-normalVec) + combinedColor, opacity );
+	return float4( combinedColor, opacity );
 }
