@@ -27,13 +27,14 @@ Shader "UnityChan/Skin"
 			Cull Back
 			ZTest LEqual
 CGPROGRAM
+#pragma multi_compile __ TRI_COLOR_AMBIENT
 #pragma multi_compile_fwdbase
 #pragma target 3.0
 #pragma vertex vert
 #pragma fragment frag
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
-#include "CharaSkin.cg"
+#include "CharaMain.cginc"
 ENDCG
 		}
 	}

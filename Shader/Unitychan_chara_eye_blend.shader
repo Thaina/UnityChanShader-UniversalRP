@@ -15,9 +15,9 @@ Shader "UnityChan/Eye - Transparent"
 		Blend SrcAlpha OneMinusSrcAlpha, One One
 		Tags
 		{
+			"RenderType"="Overlay"
 			"Queue"="Geometry+1" // Transparent+1"
 			"IgnoreProjector"="True"
-			"RenderType"="Overlay"
 //			"LightMode"="ForwardBase"
 			"LightMode" = "UniversalForward"
 		}
@@ -27,13 +27,14 @@ Shader "UnityChan/Eye - Transparent"
 			Cull Back
 			ZTest LEqual
 CGPROGRAM
+#pragma multi_compile __ TRI_COLOR_AMBIENT
 #pragma multi_compile_fwdbase
 #pragma target 3.0
 #pragma vertex vert
 #pragma fragment frag
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
-#include "CharaSkin.cg"
+#include "CharaMain.cginc"
 ENDCG
 		}
 	}

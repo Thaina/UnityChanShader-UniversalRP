@@ -9,7 +9,10 @@
 // Material parameters
 float4 _Color;
 float4 _ShadowColor;
+
+#ifdef SPECULAR
 float _SpecularPower;
+#endif
 
 float4 _MainTex_ST;
 
@@ -20,19 +23,23 @@ float4 _MainLightColor;
 sampler2D _MainTex;
 sampler2D _FalloffSampler;
 sampler2D _RimLightSampler;
+
+#ifdef SPECULAR
 sampler2D _SpecularReflectionSampler;
 sampler2D _EnvMapSampler;
 sampler2D _NormalMapSampler;
 
 // Constants
 #define FALLOFF_POWER 0.3
+#else
+#define FALLOFF_POWER 1.0
+#endif
 
 // Float types
-#define float_t    half
-#define float2_t   half2
-#define float3_t   half3
-#define float4_t   half4
-#define float3x3_t half3x3
+#define float_t  half
+#define float2_t half2
+#define float3_t half3
+#define float4_t half4
 
 #ifdef ENABLE_CAST_SHADOWS
 
@@ -70,16 +77,20 @@ struct v2f
 #endif
 
 // Vertex shader
+#ifdef SPECULAR
 v2f vert( appdata_tan v )
+#else
+v2f vert( appdata_base v )
+#endif
 {
 	v2f o;
 	o.pos = UnityObjectToClipPos( v.vertex );
-	o.uv.xy = TRANSFORM_TEX( v.texcoord.xy, _MainTex );
+	o.uv = TRANSFORM_TEX( v.texcoord.xy, _MainTex );
 	o.normal = normalize( mul( unity_ObjectToWorld, float4_t( v.normal, 0 ) ).xyz );
 
 	// Eye direction vector
 	float4 worldPos = mul( unity_ObjectToWorld, v.vertex );
-	o.eyeDir.xyz = normalize( _WorldSpaceCameraPos.xyz - worldPos.xyz ).xyz;
+	o.eyeDir = normalize( _WorldSpaceCameraPos - worldPos );
 	o.lightDir = WorldSpaceLightDir( v.vertex );
 
 	#ifdef ENABLE_NORMAL_MAP
@@ -95,6 +106,7 @@ v2f vert( appdata_tan v )
 	return o;
 }
 
+#ifdef SPECULAR
 // Overlay blend
 inline float3_t GetOverlayColor( float3_t inUpper, float3_t inLower )
 {
@@ -108,11 +120,14 @@ inline float3_t GetOverlayColor( float3_t inUpper, float3_t inLower )
 	half3 lerpVals = round(inLower);
 	return lerp(lowerResult, greaterResult, lerpVals);
 }
+#endif
 
 fixed3 calculateAmbientLight(half3 normalWorld)
 {
 	//Flat ambient is just the sky color
 	fixed3 ambient = unity_AmbientSky.rgb * 0.75;
+
+#ifdef TRI_COLOR_AMBIENT
 
 	//Magic constants used to tweak ambient to approximate pixel shader spherical harmonics
 	fixed3 worldUp = fixed3(0,1,0);
@@ -139,7 +154,9 @@ fixed3 calculateAmbientLight(half3 normalWorld)
 	float smoothDot = pow(abs(upDot), 1);
 	fixed3 equatorColor = lerp(equatorBlurredColor, unity_AmbientGround, smoothDot) * step(upDot, 0) + lerp(equatorBlurredColor, unity_AmbientSky, smoothDot) * step(0, upDot);
 
-	return lerp(skyGroundColor, equatorColor, saturate(equatorBright + minEquatorMix)) * 0.75;
+	ambient = lerp(skyGroundColor, equatorColor, saturate(equatorBright + minEquatorMix)) * 0.75;
+
+#endif // TRI_COLOR_AMBIENT
 
 	return ambient;
 }
@@ -171,7 +188,7 @@ fixed3 calculateAmbientLight(half3 normalWorld)
 // Fragment shader
 float4 frag( v2f i ) : COLOR
 {
-	float4_t diffSamplerColor = tex2D( _MainTex, i.uv.xy );
+	float4_t diffSamplerColor = tex2D( _MainTex, i.uv );
 
 	#ifdef ENABLE_NORMAL_MAP
 		float3_t normalVec = GetNormalFromMap( i );
@@ -180,9 +197,11 @@ float4 frag( v2f i ) : COLOR
 	#endif
 
 	// Falloff. Convert the angle between the normal and the camera direction into a lookup for the gradient
-	float_t normalDotEye = dot( normalVec, i.eyeDir.xyz );
-	float_t falloffU = clamp( 1.0 - abs( normalDotEye ), 0.02, 0.98 );
+	float_t normalDotEye = dot( normalVec, i.eyeDir );
+	float_t falloffU = clamp( 1 - abs( normalDotEye ), 0.02, 0.98 );
 	float4_t falloffSamplerColor = FALLOFF_POWER * tex2D( _FalloffSampler, float2( falloffU, 0.25f ) );
+
+#ifdef SPECULAR
 	float3_t shadowColor = diffSamplerColor.rgb * diffSamplerColor.rgb;
 	float3_t combinedColor = lerp( diffSamplerColor.rgb, shadowColor, falloffSamplerColor.r );
 	combinedColor *= ( 1.0 + falloffSamplerColor.rgb * falloffSamplerColor.a );
@@ -205,8 +224,13 @@ float4 frag( v2f i ) : COLOR
 	reflectColor = GetOverlayColor( reflectColor, combinedColor );
 
 	combinedColor = lerp( combinedColor, reflectColor, reflectionMaskColor.a );
+#else
+	float3_t combinedColor = lerp( diffSamplerColor.rgb, falloffSamplerColor.rgb * diffSamplerColor.rgb, falloffSamplerColor.a );
+	float_t specularDot = dot( normalVec, _MainLightPosition.xyz);
+	float4_t lighting = lit( normalDotEye, specularDot, 1 );
+#endif
 
-	half contributionTerm = saturate(dot(normalize(-_MainLightPosition.xyz), normalVec));
+	float contributionTerm = saturate(dot(normalize(-_MainLightPosition.xyz), normalVec));
 	combinedColor *= _Color.rgb * _MainLightColor.rgb * contributionTerm;
 	float opacity = diffSamplerColor.a * _Color.a;
 

@@ -31,6 +31,7 @@ Shader "UnityChan/Hair - Double-sided"
 			Cull Off
 			ZTest LEqual
 CGPROGRAM
+#pragma multi_compile __ TRI_COLOR_AMBIENT
 #pragma multi_compile_fwdbase
 #pragma target 3.0
 #pragma vertex vert
@@ -38,6 +39,7 @@ CGPROGRAM
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
 #define ENABLE_NORMAL_MAP
+#define SPECULAR
 #include "CharaMain.cginc"
 ENDCG
 		}
