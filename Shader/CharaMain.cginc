@@ -10,7 +10,7 @@
 float4 _Color;
 float4 _ShadowColor;
 
-#ifdef SPECULAR
+#ifdef ENABLE_SPECULAR
 float _SpecularPower;
 #endif
 
@@ -28,7 +28,7 @@ sampler2D _RimLightSampler;
 sampler2D _NormalMapSampler;
 #endif
 
-#ifdef SPECULAR
+#ifdef ENABLE_SPECULAR
 sampler2D _SpecularReflectionSampler;
 sampler2D _EnvMapSampler;
 
@@ -43,12 +43,11 @@ sampler2D _EnvMapSampler;
 #define float3_t half3
 #define float4_t half4
 
-#ifdef ENABLE_CAST_SHADOWS
-
 // Structure from vertex shader to fragment shader
 struct v2f
 {
-	float4 pos    : SV_POSITION;
+	float4 pos      : SV_POSITION;
+#ifdef ENABLE_CAST_SHADOWS
 	LIGHTING_COORDS( 0, 1 )
 	float2 uv       : TEXCOORD2;
 	float3 eyeDir   : TEXCOORD3;
@@ -58,14 +57,7 @@ struct v2f
 		float3 tangent  : TEXCOORD6;
 		float3 binormal : TEXCOORD7;
 	#endif
-};
-
 #else
-
-// Structure from vertex shader to fragment shader
-struct v2f
-{
-	float4 pos      : SV_POSITION;
 	float2 uv       : TEXCOORD0;
 	float3 eyeDir   : TEXCOORD1;
 	float3 lightDir : TEXCOORD2;
@@ -74,12 +66,12 @@ struct v2f
 		float3 tangent  : TEXCOORD4;
 		float3 binormal : TEXCOORD5;
 	#endif
+#endif
 };
 
-#endif
 
 // Vertex shader
-#ifdef SPECULAR
+#ifdef ENABLE_SPECULAR
 v2f vert( appdata_tan v )
 #else
 v2f vert( appdata_base v )
@@ -88,16 +80,17 @@ v2f vert( appdata_base v )
 	v2f o;
 	o.pos = UnityObjectToClipPos( v.vertex );
 	o.uv = TRANSFORM_TEX( v.texcoord.xy, _MainTex );
-	o.normal = normalize( mul( unity_ObjectToWorld, float4_t( v.normal, 0 ) ).xyz );
+	o.normal = normalize(mul(unity_ObjectToWorld,v.normal.xyz));
 
 	// Eye direction vector
 	float4 worldPos = mul( unity_ObjectToWorld, v.vertex );
-	o.eyeDir = normalize( _WorldSpaceCameraPos - worldPos );
+	o.eyeDir = normalize( (_WorldSpaceCameraPos - worldPos).xyz );
 	o.lightDir = WorldSpaceLightDir( v.vertex );
 
 	#ifdef ENABLE_NORMAL_MAP
 		// Binormal and tangent (for normal map)
-		o.tangent = normalize( mul( unity_ObjectToWorld, float4_t( v.tangent.xyz, 0 ) ).xyz );
+		float4 tan = mul( unity_ObjectToWorld, float4_t( v.tangent.xyz, 1 ) );
+		o.tangent = normalize( tan.xyz );
 		o.binormal = normalize( cross( o.normal, o.tangent ) * v.tangent.w );
 	#endif
 
@@ -108,7 +101,7 @@ v2f vert( appdata_base v )
 	return o;
 }
 
-#ifdef SPECULAR
+#ifdef ENABLE_SPECULAR
 // Overlay blend
 inline float3_t GetOverlayColor( float3_t inUpper, float3_t inLower )
 {
@@ -126,11 +119,10 @@ inline float3_t GetOverlayColor( float3_t inUpper, float3_t inLower )
 
 fixed3 calculateAmbientLight(half3 normalWorld)
 {
+#ifndef TRI_COLOR_AMBIENT
 	//Flat ambient is just the sky color
-	fixed3 ambient = unity_AmbientSky.rgb * 0.75;
-
-#ifdef TRI_COLOR_AMBIENT
-
+	return unity_AmbientSky.rgb;
+#else
 	//Magic constants used to tweak ambient to approximate pixel shader spherical harmonics
 	fixed3 worldUp = fixed3(0,1,0);
 	float skyGroundDotMul = 2.5;
@@ -156,18 +148,16 @@ fixed3 calculateAmbientLight(half3 normalWorld)
 	float smoothDot = pow(abs(upDot), 1);
 	fixed3 equatorColor = lerp(equatorBlurredColor, unity_AmbientGround, smoothDot) * step(upDot, 0) + lerp(equatorBlurredColor, unity_AmbientSky, smoothDot) * step(0, upDot);
 
-	ambient = lerp(skyGroundColor, equatorColor, saturate(equatorBright + minEquatorMix)) * 0.75;
-
+	return lerp(skyGroundColor, equatorColor, saturate(equatorBright + minEquatorMix));
 #endif // TRI_COLOR_AMBIENT
-
-	return ambient;
 }
-
-#ifdef ENABLE_NORMAL_MAP
 
 	// Compute normal from normal map
 	inline float3_t GetNormalFromMap( v2f input )
 	{
+#ifndef ENABLE_NORMAL_MAP
+		return -normalize(input.normal);
+#else
 		float3_t normalVec = tex2D( _NormalMapSampler, input.uv ).xyz * 2 - 1;
 
 		// Fix for Metal graphics API
@@ -180,60 +170,53 @@ fixed3 calculateAmbientLight(half3 normalWorld)
 			dot( normalVec, yBasis ),
 			dot( normalVec, zBasis )
 		);
-		normalVec = normalize( normalVec );
 
-		return normalVec;
-	}
-
+		return normalize(normalVec);
 #endif
+	}
 
 // Fragment shader
 float4 frag( v2f i ) : COLOR
 {
 	float4_t diffSamplerColor = tex2D( _MainTex, i.uv );
 
-	#ifdef ENABLE_NORMAL_MAP
-		float3_t normalVec = GetNormalFromMap( i );
-	#else
-		float3_t normalVec = i.normal;
-	#endif
+	float3_t normalVec = GetNormalFromMap( i );
 
 	// Falloff. Convert the angle between the normal and the camera direction into a lookup for the gradient
-	float_t normalDotEye = dot( normalVec, i.eyeDir );
+	float3 viewDir = normalize(i.eyeDir);
+	float3 lightDir = -normalize(_MainLightPosition.xyz);
+	float_t normalDotEye = dot( normalVec, viewDir );
 	float_t falloffU = clamp( 1 - abs( normalDotEye ), 0.02, 0.98 );
 	float4_t falloffSamplerColor = FALLOFF_POWER * tex2D( _FalloffSampler, float2( falloffU, 0.25f ) );
 
-#ifdef SPECULAR
 	float3_t shadowColor = diffSamplerColor.rgb * diffSamplerColor.rgb;
 	float3_t combinedColor = lerp( diffSamplerColor.rgb, shadowColor, falloffSamplerColor.r );
 	combinedColor *= ( 1.0 + falloffSamplerColor.rgb * falloffSamplerColor.a );
 
+	float3 sumlight = calculateAmbientLight(-normalVec);
+	float nDotL = dot(normalVec,lightDir);
+#ifdef ENABLE_SPECULAR
 	// Specular
-	// Use the eye vector as the light vector
-	float_t specularDot = dot( normalVec, i.eyeDir.xyz );
-	float4_t occlusion = lit( normalDotEye, specularDot, 1 );
+	float3 halfVec = normalize(lightDir + viewDir);
+	float nDotH = dot(normalVec,halfVec);
+	float4 lighting = lit( nDotL,nDotH,_SpecularPower );
 
-	specularDot = dot( normalVec, _MainLightPosition.xyz);
-	float4_t lighting = lit( normalDotEye, specularDot, _SpecularPower );
-
-	float4_t reflectionMaskColor = tex2D( _SpecularReflectionSampler, i.uv.xy );
-	combinedColor.rgb += saturate( lighting.z ) * reflectionMaskColor.rgb * diffSamplerColor.rgb;
+	float4_t reflectionMaskColor = tex2D( _SpecularReflectionSampler, i.uv );
+	sumlight += lighting.z * (_MainLightColor.rgb + reflectionMaskColor.rgb);
 
 	// Reflection
-	float3_t reflectVector = reflect( -i.eyeDir.xyz, normalVec ).xzy;
+	float3_t reflectVector = reflect( viewDir, normalVec );
 	float2_t sphereMapCoords = 0.5 * ( float2_t( 1.0, 1.0 ) + reflectVector.xy );
 	float3_t reflectColor = tex2D( _EnvMapSampler, sphereMapCoords ).rgb;
 	reflectColor = GetOverlayColor( reflectColor, combinedColor );
 
 	combinedColor = lerp( combinedColor, reflectColor, reflectionMaskColor.a );
 #else
-	float3_t combinedColor = lerp( diffSamplerColor.rgb, falloffSamplerColor.rgb * diffSamplerColor.rgb, falloffSamplerColor.a );
-	float_t specularDot = dot( normalVec, _MainLightPosition.xyz);
-	float4_t lighting = lit( normalDotEye, specularDot, 1 );
+	float4 lighting = float4(0,saturate(nDotL),0,0);
 #endif
 
-	float contributionTerm = saturate(dot(normalize(-_MainLightPosition.xyz), normalVec));
-	combinedColor *= _Color.rgb * ((_MainLightColor.rgb * contributionTerm) + calculateAmbientLight(-normalVec));
+	sumlight += _MainLightColor.rgb * lighting.y;
+	combinedColor *= _Color.rgb * diffSamplerColor.rgb * sumlight;
 	float opacity = diffSamplerColor.a * _Color.a;
 
 #ifdef ENABLE_CAST_SHADOWS

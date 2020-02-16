@@ -39,7 +39,7 @@ CGPROGRAM
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
 #define ENABLE_NORMAL_MAP
-#define SPECULAR
+#define ENABLE_SPECULAR
 #include "CharaMain.cginc"
 ENDCG
 		}
@@ -56,7 +56,6 @@ CGPROGRAM
 #include "CharaOutline.cginc"
 ENDCG
 		}
-
 	}
 
 	FallBack "Transparent/Cutout/Diffuse"
